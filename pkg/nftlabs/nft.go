@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/ethereum/go-ethereum/core/types"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"math/big"
 	"sync"
+
+	"github.com/ethereum/go-ethereum/core/types"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -28,6 +29,7 @@ type Nft interface {
 	SetApproval(operator string, approved bool) error
 	Mint(metadata MintNftMetadata) (NftMetadata, error)
 	MintBatch(meta []MintNftMetadata) ([]NftMetadata, error)
+	MintBatchTo(meta []MintNftMetadata, to string) ([]NftMetadata, error)
 	Burn(tokenId *big.Int) error
 	TransferFrom(from string, to string, tokenId *big.Int) error
 	SetRoyaltyBps(amount *big.Int) error
@@ -49,7 +51,11 @@ type NftModule struct {
 }
 
 func (sdk *NftModule) MintBatch(meta []MintNftMetadata) ([]NftMetadata, error) {
-	if sdk.main.getSignerAddress() == common.HexToAddress("0") {
+	return sdk.MintBatchTo(meta, sdk.main.getSignerAddress().String())
+}
+func (sdk *NftModule) MintBatchTo(meta []MintNftMetadata, to string) ([]NftMetadata, error) {
+	dst := common.HexToAddress(to)
+	if dst == common.HexToAddress("0") {
 		return nil, &NoSignerError{typeName: "nft"}
 	}
 
@@ -63,7 +69,10 @@ func (sdk *NftModule) MintBatch(meta []MintNftMetadata) ([]NftMetadata, error) {
 		out[i] = m
 	}
 	uris, err := storage.UploadBatch(out, sdk.Address, sdk.main.getSignerAddress().String())
-	tx, err := sdk.module.MintNFTBatch(sdk.main.getTransactOpts(true), sdk.main.getSignerAddress(), uris)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := sdk.module.MintNFTBatch(sdk.main.getTransactOpts(true), dst, uris)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +187,7 @@ func (sdk *NftModule) MintTo(to string, metadata MintNftMetadata) (NftMetadata, 
 		Image:       metadata.Image,
 		Description: metadata.Description,
 		Name:        metadata.Name,
-		Properties: metadata.Properties,
+		Properties:  metadata.Properties,
 	}, err
 }
 
@@ -272,7 +281,7 @@ func newNftModule(client *ethclient.Client, address string, main ISdk) (Nft, err
 		Client:  client,
 		Address: address,
 		module:  module,
-		main: main,
+		main:    main,
 	}, nil
 }
 
