@@ -60,10 +60,9 @@ func newCurrencyModule(client *ethclient.Client, asset string, main ISdk) (*Curr
 		Client:  client,
 		Address: asset,
 		module:  module,
-		main: main,
+		main:    main,
 	}, nil
 }
-
 
 func (sdk *CurrencyModule) TotalSupply() (*big.Int, error) {
 	return sdk.module.TotalSupply(&bind.CallOpts{})
@@ -207,7 +206,7 @@ func (sdk *CurrencyModule) GetValue(value *big.Int) (CurrencyValue, error) {
 			Symbol:   symbol,
 			Decimals: decimals,
 		},
-		Value: value,
+		Value:        value,
 		DisplayValue: sdk.formatUnits(value, big.NewInt(int64(decimals))),
 	}, nil
 }
@@ -217,7 +216,7 @@ func (sdk *CurrencyModule) Balance() (CurrencyValue, error) {
 		return CurrencyValue{}, &NoSignerError{typeName: "nft"}
 	}
 	if balance, err := sdk.module.BalanceOf(&bind.CallOpts{}, sdk.main.getSignerAddress()); err != nil {
-		 return CurrencyValue{}, err
+		return CurrencyValue{}, err
 	} else {
 		return sdk.GetValue(balance)
 	}
@@ -264,3 +263,10 @@ func (sdk *CurrencyModule) SetRestrictedTransfer(restricted bool) error {
 		return waitForTx(sdk.Client, tx.Hash(), txWaitTimeBetweenAttempts, txMaxAttempts)
 	}
 }
+
+var specialCurrency = map[chainId][]string{
+	big.NewInt(137):   polygonnetCurrencies,
+	big.NewInt(80001): polygonnetCurrencies,
+}
+
+var polygonnetCurrencies = []string{`0x0000000000000000000000000000000000001010`}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/akbarfa49/collection/S"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -45,7 +46,7 @@ func newMarketModule(client *ethclient.Client, address string, main ISdk) (*Mark
 		Client:  client,
 		Address: address,
 		module:  module,
-		main: main,
+		main:    main,
 	}, nil
 }
 
@@ -74,8 +75,7 @@ func (sdk *MarketModule) GetListing(listingId *big.Int) (Listing, error) {
 }
 
 func (sdk *MarketModule) GetAll(filter ListingFilter) ([]Listing, error) {
-	listings := make([]abi.MarketListing, 0)
-
+	var listings []abi.MarketListing
 	hasFilter := filter.TokenContract != "" || filter.TokenId != nil || filter.Seller != ""
 
 	if !hasFilter {
@@ -83,34 +83,31 @@ func (sdk *MarketModule) GetAll(filter ListingFilter) ([]Listing, error) {
 		if err != nil {
 			return nil, err
 		}
-		for _, l := range result {
-			listings = append(listings, l)
-		}
+		listings = make([]abi.MarketListing, len(result))
+		copy(listings, result)
+
 	} else {
 		if filter.TokenContract != "" && filter.TokenId != nil {
 			result, err := sdk.module.GetListingsByAsset(&bind.CallOpts{}, common.HexToAddress(filter.TokenContract), filter.TokenId)
 			if err != nil {
 				return nil, err
 			}
-			for _, l := range result {
-				listings = append(listings, l)
-			}
+			listings = make([]abi.MarketListing, len(result))
+			copy(listings, result)
 		} else if filter.Seller != "" {
 			result, err := sdk.module.GetListingsBySeller(&bind.CallOpts{}, common.HexToAddress(filter.Seller))
 			if err != nil {
 				return nil, err
 			}
-			for _, l := range result {
-				listings = append(listings, l)
-			}
+			listings = make([]abi.MarketListing, len(result))
+			copy(listings, result)
 		} else if filter.TokenContract != "" {
 			result, err := sdk.module.GetListingsByAssetContract(&bind.CallOpts{}, common.HexToAddress(filter.TokenContract))
 			if err != nil {
 				return nil, err
 			}
-			for _, l := range result {
-				listings = append(listings, l)
-			}
+			listings = make([]abi.MarketListing, len(result))
+			copy(listings, result)
 		}
 	}
 
@@ -129,20 +126,20 @@ func (sdk *MarketModule) GetAll(filter ListingFilter) ([]Listing, error) {
 			continue
 		}
 
-		if filter.Seller != "" && strings.ToLower(filter.Seller) != strings.ToLower(listing.Seller.String()) {
+		if filter.Seller != "" && !strings.EqualFold(filter.Seller, listing.Seller.String()) {
 			continue
 		}
 
-		if filter.TokenContract != "" && strings.ToLower(filter.TokenContract) != strings.ToLower(listing.AssetContract.String()) {
+		if filter.TokenContract != "" && !strings.EqualFold(filter.TokenContract, listing.AssetContract.String()) {
 			continue
 		}
 
-		if filter.TokenId.String() != "" && strings.ToLower(filter.TokenId.String()) != strings.ToLower(listing.TokenId.String()) {
+		if filter.TokenId != nil && !strings.EqualFold(filter.TokenId.String(), listing.TokenId.String()) {
 			continue
 		}
 
 		if transformed, err := sdk.transformResultToListing(listing); err != nil {
-			return nil, err
+			continue
 		} else {
 			availableListings = append(availableListings, transformed)
 		}
@@ -295,7 +292,7 @@ func (sdk *MarketModule) transformResultToListing(listing abi.MarketListing) (Li
 	listingCurrency := listing.Currency
 
 	var currencyMetadata *CurrencyValue
-	if strings.HasPrefix(listingCurrency.String(), "0x000000000000") {
+	if S.HasPrefix(listingCurrency.String(), []string{`0x000000000000`}, sdk.main.getOptions().SpecialCurrency) {
 		currencyMetadata = nil
 	} else {
 		// TODO: this is bad, don't want to create an instance of the module every time
@@ -335,14 +332,16 @@ func (sdk *MarketModule) transformResultToListing(listing abi.MarketListing) (Li
 
 	var saleStart *time.Time
 	if listing.SaleStart.Int64() > 0 {
-		time.Unix(listing.SaleStart.Int64()*1000, 0)
+		tm := time.Unix(listing.SaleStart.Int64()*1000, 0)
+		saleStart = &tm
 	} else {
 		saleStart = nil
 	}
 
 	var saleEnd *time.Time
-	if listing.SaleEnd.Int64() > 0 && listing.SaleEnd.Int64() < math.MaxInt64 - 1 {
-		time.Unix(listing.SaleEnd.Int64()*1000, 0)
+	if listing.SaleEnd.Int64() > 0 && listing.SaleEnd.Int64() < math.MaxInt64-1 {
+		tm := time.Unix(listing.SaleEnd.Int64()*1000, 0)
+		saleEnd = &tm
 	} else {
 		saleEnd = nil
 	}
@@ -361,4 +360,3 @@ func (sdk *MarketModule) transformResultToListing(listing abi.MarketListing) (Li
 		SaleEnd:          saleEnd,
 	}, nil
 }
-

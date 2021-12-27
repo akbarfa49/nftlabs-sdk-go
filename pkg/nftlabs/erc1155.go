@@ -1,8 +1,8 @@
 package nftlabs
 
 import (
-	"context"
 	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -49,8 +49,6 @@ func (sdk *erc1155Module) SetPrivateKey(privateKey string) error {
 }
 func (sdk *erc1155Module) getSigner() func(address common.Address, transaction *types.Transaction) (*types.Transaction, error) {
 	return func(address common.Address, transaction *types.Transaction) (*types.Transaction, error) {
-		ctx := context.Background()
-		chainId, _ := sdk.Client.ChainID(ctx)
-		return types.SignTx(transaction, types.NewEIP155Signer(chainId), sdk.privateKey)
+		return types.SignTx(transaction, types.NewEIP155Signer(sdk.Options.ChainID), sdk.privateKey)
 	}
 }

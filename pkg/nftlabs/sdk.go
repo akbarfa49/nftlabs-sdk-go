@@ -47,7 +47,10 @@ type Sdk struct {
 	gateway Storage
 }
 
+var chainCache = make(map[string]*big.Int, 0)
+
 func NewSdk(client *ethclient.Client, opt *SdkOptions) (*Sdk, error) {
+
 	if opt.IpfsGatewayUrl == "" {
 		opt.IpfsGatewayUrl = "https://cloudflare-ipfs.com/ipfs/"
 	}
@@ -64,7 +67,19 @@ func NewSdk(client *ethclient.Client, opt *SdkOptions) (*Sdk, error) {
 			return nil, err
 		}
 	}
-
+	if sdk.opt.ChainID == nil {
+		if v, ok := chainCache[opt.RpcUri]; !ok {
+			chainId, err := sdk.client.ChainID(context.TODO())
+			if err != nil {
+				return nil, err
+			}
+			chainCache[opt.RpcUri] = chainId
+			sdk.opt.ChainID = chainId
+		} else {
+			sdk.opt.ChainID = v
+		}
+	}
+	sdk.opt.SpecialCurrency = append(sdk.opt.SpecialCurrency, specialCurrency[sdk.opt.ChainID]...)
 	return sdk, nil
 }
 
@@ -162,9 +177,7 @@ func (sdk *Sdk) setPrivateKey(privateKey string) error {
 
 func (sdk *Sdk) getSigner() func(address common.Address, transaction *types.Transaction) (*types.Transaction, error) {
 	return func(address common.Address, transaction *types.Transaction) (*types.Transaction, error) {
-		ctx := context.Background()
-		chainId, _ := sdk.client.ChainID(ctx)
-		return types.SignTx(transaction, types.LatestSignerForChainID(chainId), sdk.privateKey)
+		return types.SignTx(transaction, types.LatestSignerForChainID(sdk.opt.ChainID), sdk.privateKey)
 	}
 }
 
@@ -227,12 +240,7 @@ func (sdk *Sdk) TransferNativeToken(to string, amount *big.Int) error {
 	var data []byte
 	tx := types.NewTransaction(nonce, common.HexToAddress(to), amount, gasLimit, gasPrice, data)
 
-	chainID, err := sdk.client.NetworkID(context.Background())
-	if err != nil {
-		return err
-	}
-
-	signedTx, err := types.SignTx(tx, types.LatestSignerForChainID(chainID), sdk.privateKey)
+	signedTx, err := types.SignTx(tx, types.LatestSignerForChainID(sdk.opt.ChainID), sdk.privateKey)
 	if err != nil {
 		return err
 	}
@@ -244,3 +252,5 @@ func (sdk *Sdk) TransferNativeToken(to string, amount *big.Int) error {
 
 	return nil
 }
+
+type chainId *big.Int
