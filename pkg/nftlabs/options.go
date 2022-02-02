@@ -7,6 +7,7 @@ type SdkOptions struct {
 	PrivateKey              string
 	GasSpeed                string
 	MaxGasPriceInGwei       *big.Int
+	GasPrice                *big.Int
 	RegistryContractAddress string
 	RpcUri                  string
 	ChainID                 *big.Int

@@ -211,11 +211,22 @@ func (sdk *Sdk) getTransactOpts(send bool) *bind.TransactOpts {
 		feeCap = big.NewInt(0).Add(baseFee, tipCap)
 	}
 
+	if sdk.opt.GasPrice != nil {
+		gasPriceInGwei := big.NewInt(1)
+		toGweiFactor := big.NewInt(1).Exp(big.NewInt(10), big.NewInt(9), nil)
+
+		finalGasPrice := gasPriceInGwei.Mul(sdk.opt.GasPrice, toGweiFactor)
+		return &bind.TransactOpts{
+			NoSend:   !send,
+			From:     sdk.getSignerAddress(),
+			Signer:   sdk.getSigner(),
+			GasPrice: finalGasPrice,
+		}
+	}
 	return &bind.TransactOpts{
 		NoSend:    !send,
 		From:      sdk.getSignerAddress(),
 		Signer:    sdk.getSigner(),
-		GasPrice:  sdk.opt.MaxGasPriceInGwei,
 		GasTipCap: tipCap,
 		GasFeeCap: feeCap,
 	}
