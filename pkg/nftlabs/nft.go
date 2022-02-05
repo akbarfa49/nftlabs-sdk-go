@@ -470,20 +470,35 @@ func (sdk *NftModule) Transfer(to string, tokenId *big.Int) error {
 
 func (sdk *NftModule) getNewMintedNft(logs []*types.Log) (*big.Int, error) {
 	var tokenId *big.Int
-	for _, l := range logs {
-		iterator, err := sdk.module.ParseTokenMinted(*l)
-		if err != nil {
-			continue
+	if sdk.isV1() {
+		for _, l := range logs {
+			iterator, err := sdk.oldModule.ParseMinted(*l)
+			if err != nil {
+				continue
+			}
+
+			if iterator.TokenId != nil {
+				tokenId = iterator.TokenId
+				break
+			}
 		}
 
-		if iterator.TokenIdMinted != nil {
-			tokenId = iterator.TokenIdMinted
-			break
+	} else {
+		for _, l := range logs {
+			iterator, err := sdk.module.ParseTokenMinted(*l)
+			if err != nil {
+				continue
+			}
+
+			if iterator.TokenIdMinted != nil {
+				tokenId = iterator.TokenIdMinted
+				break
+			}
 		}
 	}
 
 	if tokenId == nil {
-		return nil, errors.New("Could not find Minted event for transaction")
+		return nil, errors.New("could not find Minted event for transaction")
 	}
 
 	return tokenId, nil
@@ -504,7 +519,7 @@ func (sdk *NftModule) getNewMintedBatch(logs []*types.Log) (*abi.OldNFTMintedBat
 	}
 
 	if batch == nil {
-		return nil, errors.New("Could not find Minted batch event for transaction")
+		return nil, errors.New("could not find Minted batch event for transaction")
 	}
 
 	return batch, nil
