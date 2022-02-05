@@ -55,7 +55,7 @@ type NftModule struct {
 	main ISdk
 }
 
-func (sdk *NftModule) v1MintBatch(meta []MintNftMetadata) ([]NftMetadata, error) {
+func (sdk *NftModule) v1MintBatch(meta []MintNftMetadata, to common.Address) ([]NftMetadata, error) {
 	if sdk.main.getSignerAddress() == common.HexToAddress("0") {
 		return nil, &NoSignerError{typeName: "nft"}
 	}
@@ -70,7 +70,10 @@ func (sdk *NftModule) v1MintBatch(meta []MintNftMetadata) ([]NftMetadata, error)
 		out[i] = m
 	}
 	uris, err := storage.UploadBatch(out, sdk.Address, sdk.main.getSignerAddress().String())
-	tx, err := sdk.oldModule.MintNFTBatch(sdk.main.getTransactOpts(true), sdk.main.getSignerAddress(), uris)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := sdk.oldModule.MintNFTBatch(sdk.main.getTransactOpts(true), to, uris)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +120,7 @@ func (sdk *NftModule) MintBatch(meta []MintNftMetadata) ([]NftMetadata, error) {
 }
 func (sdk *NftModule) MintBatchTo(meta []MintNftMetadata, to string) ([]NftMetadata, error) {
 	if sdk.isV1() {
-		return sdk.v1MintBatch(meta)
+		return sdk.v1MintBatch(meta, common.HexToAddress(to))
 	}
 
 	// TODO: Update this method to perform a multi-call to mintTo
