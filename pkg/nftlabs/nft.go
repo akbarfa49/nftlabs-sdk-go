@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"golang.org/x/sync/errgroup"
@@ -227,8 +228,11 @@ func (sdk *NftModule) MintTo(to string, metadata MintNftMetadata) (NftMetadata, 
 		// TODO: return clearer error
 		return NftMetadata{}, err
 	}
-
-	receipt, err := sdk.Client.TransactionReceipt(context.Background(), tx.Hash())
+	var receipt *types.Receipt
+	for i := 0; i < 30; i++ {
+		receipt, err = sdk.Client.TransactionReceipt(context.Background(), tx.Hash())
+		time.Sleep(4 * time.Second)
+	}
 	if err != nil {
 		log.Printf("Failed to lookup transaction receipt with hash %v\n", tx.Hash().String())
 		return NftMetadata{}, err

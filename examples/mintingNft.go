@@ -1,10 +1,10 @@
 package examples
 
 import (
+	"log"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/nftlabs/nftlabs-sdk-go/pkg/nftlabs"
-	"log"
-	"math/big"
 )
 
 func main() {
@@ -27,13 +27,9 @@ func main() {
 	}
 
 	if result, err := nftModule.Mint(nftlabs.MintNftMetadata{
-		Name:                 "",
-		Description:          "",
-		Image:                "",
-		ExternalUrl:          "",
-		SellerFeeBasisPoints: big.NewInt(1000), // 10%
-		FeeRecipient:         "",
-		BackgroundColor:      "",
+		Name:        "",
+		Description: "",
+		Image:       "",
 	}); err != nil {
 		log.Fatal(err)
 	} else {
