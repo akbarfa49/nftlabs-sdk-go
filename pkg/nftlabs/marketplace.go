@@ -115,7 +115,7 @@ func (sdk *MarketplaceModule) GetAll(filter ListingFilter) ([]Listing, error) {
 	for _, listing := range filteredListings {
 		transformed, err := sdk.transformResultToListing(listing)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		results = append(results, transformed)
 	}
