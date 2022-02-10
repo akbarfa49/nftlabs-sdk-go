@@ -88,6 +88,9 @@ func (sdk *MarketplaceModule) GetAll(filter ListingFilter) ([]Listing, error) {
 		if err != nil {
 			return nil, err
 		}
+		if !sdk.isStillValidDirectListing(listing) {
+			continue
+		}
 		listings = append(listings, listing)
 	}
 
@@ -124,9 +127,19 @@ func (sdk *MarketplaceModule) GetAll(filter ListingFilter) ([]Listing, error) {
 }
 
 func (sdk *MarketplaceModule) isStillValidDirectListing(listing abi.IMarketplaceListing) bool {
+	nftAbi, err := abi.NewERC721(listing.AssetContract, sdk.Client)
+	if err != nil {
+		return false
+	}
+	addr, err := nftAbi.OwnerOf(&bind.CallOpts{}, listing.TokenId)
+	if err != nil {
+		return false
+	}
+
 	// TODO: check token owner balance
 	// TODO: check token owner approval
-	return true
+
+	return strings.EqualFold(addr.String(), listing.TokenOwner.String())
 }
 
 func (sdk *MarketplaceModule) transformResultToListing(listing abi.IMarketplaceListing) (Listing, error) {
