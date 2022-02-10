@@ -304,6 +304,9 @@ func (sdk *NftModule) MintTo(to string, metadata MintNftMetadata) (NftMetadata, 
 	var receipt *types.Receipt
 	for i := 0; i < 30; i++ {
 		receipt, err = sdk.Client.TransactionReceipt(context.Background(), tx.Hash())
+		if err == nil {
+			break
+		}
 		time.Sleep(4 * time.Second)
 	}
 	if err != nil {
