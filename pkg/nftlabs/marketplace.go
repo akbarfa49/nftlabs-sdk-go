@@ -88,9 +88,6 @@ func (sdk *MarketplaceModule) GetAll(filter ListingFilter) ([]Listing, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !sdk.isStillValidDirectListing(listing) {
-			continue
-		}
 		listings = append(listings, listing)
 	}
 
@@ -135,7 +132,6 @@ func (sdk *MarketplaceModule) isStillValidDirectListing(listing abi.IMarketplace
 	if err != nil {
 		return false
 	}
-
 	// TODO: check token owner balance
 	// TODO: check token owner approval
 
