@@ -156,8 +156,14 @@ func (sdk *NftModule) MintBatchTo(to string, meta []MintNftMetadata) ([]NftMetad
 			// TODO: return clearer error
 			return nil, err
 		}
-
-		receipt, err := sdk.Client.TransactionReceipt(context.Background(), tx.Hash())
+		var receipt *types.Receipt
+		for i := 0; i < 30; i++ {
+			receipt, err = sdk.Client.TransactionReceipt(context.Background(), tx.Hash())
+			if err == nil {
+				break
+			}
+			time.Sleep(4 * time.Second)
+		}
 		if err != nil {
 			log.Printf("Failed to lookup transaction receipt with hash %v\n", tx.Hash().String())
 			return nil, err
