@@ -108,7 +108,11 @@ func (sdk *NftModule) v1MintBatch(meta []MintNftMetadata, to string) ([]NftMetad
 
 	if err := wg.Wait(); err != nil {
 		log.Println("Failed to get the newly minted batch")
-		return nil, err
+		//dont skip the tokenId because the data is minted already
+		for idx, id := range batch.TokenIds {
+			results[idx] = NftMetadata{Id: id}
+		}
+		return results, err
 	}
 	return results, nil
 }
@@ -197,7 +201,10 @@ func (sdk *NftModule) MintBatchTo(to string, meta []MintNftMetadata) ([]NftMetad
 
 		if err := wg.Wait(); err != nil {
 			log.Println("Failed to get the newly minted batch")
-			return nil, err
+			for idx, id := range tokenIds {
+				results[idx] = NftMetadata{Id: id}
+			}
+			return results, err
 		}
 
 		return results, nil
