@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/kpango/fastime"
 	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
 )
 
@@ -135,7 +136,7 @@ func (sdk *MarketplaceModule) isStillValidDirectListing(listing abi.IMarketplace
 	// TODO: check token owner balance
 	// TODO: check token owner approval
 
-	return strings.EqualFold(addr.String(), listing.TokenOwner.String())
+	return fastime.UnixNow() < listing.EndTime.Int64() && strings.EqualFold(addr.String(), listing.TokenOwner.String())
 }
 
 func (sdk *MarketplaceModule) transformResultToListing(listing abi.IMarketplaceListing) (Listing, error) {
@@ -182,7 +183,7 @@ func (sdk *MarketplaceModule) transformResultToListing(listing abi.IMarketplaceL
 
 	var saleStart *time.Time
 	if listing.StartTime.Int64() > 0 {
-		tm := time.Unix(listing.StartTime.Int64()*1000, 0)
+		tm := time.Unix(listing.StartTime.Int64(), 0)
 		saleStart = &tm
 	} else {
 		saleStart = nil
@@ -190,7 +191,7 @@ func (sdk *MarketplaceModule) transformResultToListing(listing abi.IMarketplaceL
 
 	var saleEnd *time.Time
 	if listing.EndTime.Int64() > 0 && listing.EndTime.Int64() < math.MaxInt64-1 {
-		tm := time.Unix(listing.EndTime.Int64()*1000, 0)
+		tm := time.Unix(listing.EndTime.Int64(), 0)
 		saleEnd = &tm
 	} else {
 		saleEnd = nil
