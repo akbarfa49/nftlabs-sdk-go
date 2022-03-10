@@ -11,5 +11,4 @@ type SdkOptions struct {
 	RegistryContractAddress string
 	RpcUri                  string
 	ChainID                 *big.Int
-	SpecialCurrency         []string
 }

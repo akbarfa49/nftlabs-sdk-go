@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/nftlabs/nftlabs-sdk-go/pkg/nftlabs"
-	"github.com/spf13/cobra"
 	"log"
 	"math/big"
 	"strconv"
+
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/nftlabs"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -19,7 +20,7 @@ var currencyCmd = &cobra.Command{
 }
 
 var currencyGetCmd = &cobra.Command{
-	Use: "get",
+	Use:   "get",
 	Short: "Gets the currency at the specified address",
 	Run: func(cmd *cobra.Command, args []string) {
 		module, err := getCurrencyModule()
@@ -36,9 +37,9 @@ var currencyGetCmd = &cobra.Command{
 }
 
 var currencyMintCmd = &cobra.Command{
-	Use: "mint [amount]",
-	Short: "Mints [amount] of currency at the specified address",
-	Args: cobra.ExactArgs(1),
+	Use:       "mint [amount]",
+	Short:     "Mints [amount] of currency at the specified address",
+	Args:      cobra.ExactArgs(1),
 	ValidArgs: []string{"amount"},
 	Run: func(cmd *cobra.Command, args []string) {
 		amount, err := strconv.ParseInt(args[0], 10, 64)
@@ -56,7 +57,7 @@ var currencyMintCmd = &cobra.Command{
 			panic(err)
 		}
 
-		if err := module.Mint(big.NewInt(amount)); err != nil {
+		if _, err := module.Mint(true, big.NewInt(amount)); err != nil {
 			panic(err)
 		}
 		fmt.Printf("Minted %d %v\n", amount, currency.Symbol)
@@ -64,7 +65,7 @@ var currencyMintCmd = &cobra.Command{
 }
 
 var currencyTotalSupplyCmd = &cobra.Command{
-	Use: "totalSupply",
+	Use:   "totalSupply",
 	Short: "Gets the total supply of the currency at the specified address",
 	Run: func(cmd *cobra.Command, args []string) {
 		module, err := getCurrencyModule()
@@ -82,7 +83,7 @@ var currencyTotalSupplyCmd = &cobra.Command{
 }
 
 var currencyBurnCmd = &cobra.Command{
-	Use: "burn [amount]",
+	Use:   "burn [amount]",
 	Short: "Burns [amount] of the currency at the specified address",
 	Run: func(cmd *cobra.Command, args []string) {
 		amount, err := strconv.ParseInt(args[0], 10, 64)
@@ -95,7 +96,7 @@ var currencyBurnCmd = &cobra.Command{
 			panic(err)
 		}
 
-		if err := module.Burn(big.NewInt(amount)); err != nil {
+		if _, err := module.Burn(true, big.NewInt(amount)); err != nil {
 			panic(err)
 		}
 
@@ -104,11 +105,11 @@ var currencyBurnCmd = &cobra.Command{
 }
 
 var currencyGrantRoleCmd = &cobra.Command{
-	Use: "grantRole [role] [address]",
-	Short: "Grants the role `role` to the wallet at `address`",
-	Args: cobra.ExactArgs(2),
+	Use:        "grantRole [role] [address]",
+	Short:      "Grants the role `role` to the wallet at `address`",
+	Args:       cobra.ExactArgs(2),
 	ArgAliases: []string{"role, address"},
-	Example: "grantRole admin|minter `address`",
+	Example:    "grantRole admin|minter `address`",
 	Run: func(cmd *cobra.Command, args []string) {
 		role := args[0]
 		address := args[1]

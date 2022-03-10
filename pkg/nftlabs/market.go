@@ -10,7 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/akbarfa49/collection/S"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -292,7 +291,7 @@ func (sdk *MarketModule) transformResultToListing(listing abi.MarketListing) (Li
 	listingCurrency := listing.Currency
 
 	var currencyMetadata *CurrencyValue
-	if S.HasPrefix(listingCurrency.String(), []string{`0x000000000000`}, sdk.main.getOptions().SpecialCurrency) {
+	if strings.HasPrefix(listingCurrency.String(), "0x000000000000") {
 		currencyMetadata = nil
 	} else {
 		// TODO: this is bad, don't want to create an instance of the module every time

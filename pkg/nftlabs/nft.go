@@ -25,18 +25,19 @@ type Nft interface {
 	GetOwned(address string) ([]NftMetadata, error)
 	Balance(tokenId *big.Int) (*big.Int, error)
 	BalanceOf(address string) (*big.Int, error)
-	Transfer(to string, tokenId *big.Int) error
+	Transfer(send bool, to string, tokenId *big.Int) (*types.Transaction, error)
 	TotalSupply() (*big.Int, error)
 	SetApproval(operator string, approved bool) error
-	Mint(metadata MintNftMetadata) (NftMetadata, error)
-	MintBatch(meta []MintNftMetadata) ([]NftMetadata, error)
-	MintBatchTo(to string, meta []MintNftMetadata) ([]NftMetadata, error)
+	Mint(send bool, metadata MintNftMetadata) (*types.Transaction, NftMetadata, error)
+	MintBatch(send bool, meta []MintNftMetadata) (*types.Transaction, []NftMetadata, error)
+	MintBatchTo(send bool, to string, meta []MintNftMetadata) (*types.Transaction, []NftMetadata, error)
 	Burn(tokenId *big.Int) error
-	TransferFrom(from string, to string, tokenId *big.Int) error
+	TransferFrom(send bool, from string, to string, tokenId *big.Int) (*types.Transaction, error)
 	SetRoyaltyBps(amount *big.Int) error
 	SetRestrictedTransfer(restricted bool) error
 
-	MintTo(to string, meta MintNftMetadata) (NftMetadata, error)
+	MintTo(send bool, to string, meta MintNftMetadata) (*types.Transaction, NftMetadata, error)
+	Multicall(data ...[]byte) (*types.Transaction, error)
 
 	getModule() *abi.NFT
 }
@@ -56,14 +57,23 @@ type NftModule struct {
 	main ISdk
 }
 
-func (sdk *NftModule) v1MintBatch(meta []MintNftMetadata, to string) ([]NftMetadata, error) {
+func (sdk *NftModule) Multicall(data ...[]byte) (*types.Transaction, error) {
+	transact, err := sdk.module.Multicall(sdk.main.getTransactOpts(true), data)
+	if err != nil {
+		return nil, err
+	}
+	err = waitForTx(sdk.Client, transact.Hash(), txWaitTimeBetweenAttempts, txMaxAttempts)
+	return transact, err
+}
+
+func (sdk *NftModule) v1MintBatch(send bool, meta []MintNftMetadata, to string) (*types.Transaction, []NftMetadata, error) {
 	if sdk.main.getSignerAddress() == common.HexToAddress("0") {
-		return nil, &NoSignerError{typeName: "nft"}
+		return nil, nil, &NoSignerError{typeName: "nft"}
 	}
 
 	storage, err := sdk.main.GetStorage()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	out := make([]interface{}, len(meta))
@@ -71,23 +81,28 @@ func (sdk *NftModule) v1MintBatch(meta []MintNftMetadata, to string) ([]NftMetad
 		out[i] = m
 	}
 	uris, err := storage.UploadBatch(out, sdk.Address, sdk.main.getSignerAddress().String())
-	tx, err := sdk.oldModule.MintNFTBatch(sdk.main.getTransactOpts(true), common.HexToAddress(to), uris)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
+	tx, err := sdk.oldModule.MintNFTBatch(sdk.main.getTransactOpts(send), common.HexToAddress(to), uris)
+	if err != nil {
+		return tx, nil, err
+	}
+	if !send {
+		return tx, nil, nil
+	}
 	if err := waitForTx(sdk.Client, tx.Hash(), txWaitTimeBetweenAttempts, txMaxAttempts); err != nil {
-		return nil, err
+		return tx, nil, err
 	}
 
 	receipt, err := sdk.Client.TransactionReceipt(context.Background(), tx.Hash())
 	if err != nil {
-		return nil, err
+		return tx, nil, err
 	}
 
 	batch, err := sdk.getNewMintedBatch(receipt.Logs)
 	if err != nil {
-		return nil, err
+		return tx, nil, err
 	}
 
 	wg := new(errgroup.Group)
@@ -112,26 +127,30 @@ func (sdk *NftModule) v1MintBatch(meta []MintNftMetadata, to string) ([]NftMetad
 		for idx, id := range batch.TokenIds {
 			results[idx] = NftMetadata{Id: id}
 		}
-		return results, err
+		return tx, results, err
 	}
-	return results, nil
+	return tx, results, nil
 }
 
-func (sdk *NftModule) MintBatch(meta []MintNftMetadata) ([]NftMetadata, error) {
-	return sdk.MintBatchTo(sdk.main.getSignerAddress().String(), meta)
+func (sdk *NftModule) MintBatch(send bool, meta []MintNftMetadata) (*types.Transaction, []NftMetadata, error) {
+	return sdk.MintBatchTo(send, sdk.main.getSignerAddress().String(), meta)
 }
-func (sdk *NftModule) MintBatchTo(to string, meta []MintNftMetadata) ([]NftMetadata, error) {
+func (sdk *NftModule) MintBatchTo(send bool, to string, meta []MintNftMetadata) (*types.Transaction, []NftMetadata, error) {
 	if sdk.isV1() {
-		return sdk.v1MintBatch(meta, to)
+		return sdk.v1MintBatch(send, meta, to)
 	}
 
+	return sdk.MintBatchToV2(send, to, meta)
+}
+
+func (sdk *NftModule) MintBatchToV2(send bool, to string, meta []MintNftMetadata) (*types.Transaction, []NftMetadata, error) {
 	if sdk.main.getSignerAddress() == common.HexToAddress("0") {
-		return nil, &NoSignerError{typeName: "nft"}
+		return nil, nil, &NoSignerError{typeName: "nft"}
 	}
 
 	storage, err := sdk.main.GetStorage()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	out := make([]interface{}, len(meta))
@@ -142,23 +161,26 @@ func (sdk *NftModule) MintBatchTo(to string, meta []MintNftMetadata) ([]NftMetad
 	data := make([][]byte, 0)
 	uris, err := storage.UploadBatch(out, sdk.Address, sdk.main.getSignerAddress().String())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, uri := range uris {
 		tx, err := sdk.module.NFTTransactor.MintTo(sdk.main.getTransactOpts(false), common.HexToAddress(to), uri)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+		if !send {
+			return tx, nil, nil
 		}
 		data = append(data, tx.Data())
 	}
 
 	if tx, err := sdk.module.Multicall(sdk.main.getTransactOpts(true), data); err != nil {
-		return nil, err
+		return nil, nil, err
 	} else {
 		if err := waitForTx(sdk.Client, tx.Hash(), txWaitTimeBetweenAttempts, txMaxAttempts); err != nil {
 			// TODO: return clearer error
-			return nil, err
+			return nil, nil, err
 		}
 		var receipt *types.Receipt
 		for i := 0; i < 30; i++ {
@@ -170,7 +192,8 @@ func (sdk *NftModule) MintBatchTo(to string, meta []MintNftMetadata) ([]NftMetad
 		}
 		if err != nil {
 			log.Printf("Failed to lookup transaction receipt with hash %v\n", tx.Hash().String())
-			return nil, err
+
+			return tx, nil, err
 		}
 
 		tokenIds := make([]*big.Int, 0)
@@ -204,10 +227,10 @@ func (sdk *NftModule) MintBatchTo(to string, meta []MintNftMetadata) ([]NftMetad
 			for idx, id := range tokenIds {
 				results[idx] = NftMetadata{Id: id}
 			}
-			return results, err
+			return tx, results, err
 		}
 
-		return results, nil
+		return tx, results, nil
 	}
 }
 
@@ -223,14 +246,17 @@ func (sdk *NftModule) Burn(tokenId *big.Int) error {
 	return err
 }
 
-func (sdk *NftModule) TransferFrom(from string, to string, tokenId *big.Int) error {
+func (sdk *NftModule) TransferFrom(send bool, from string, to string, tokenId *big.Int) (*types.Transaction, error) {
 	if sdk.main.getSignerAddress() == common.HexToAddress("0") {
-		return &NoSignerError{typeName: "nft"}
+		return nil, &NoSignerError{typeName: "nft"}
 	}
-	if tx, err := sdk.module.TransferFrom(sdk.main.getTransactOpts(true), common.HexToAddress(from), common.HexToAddress(to), tokenId); err != nil {
-		return err
+	if tx, err := sdk.module.TransferFrom(sdk.main.getTransactOpts(send), common.HexToAddress(from), common.HexToAddress(to), tokenId); err != nil {
+		return tx, err
 	} else {
-		return waitForTx(sdk.Client, tx.Hash(), txWaitTimeBetweenAttempts, txMaxAttempts)
+		if !send {
+			return tx, nil
+		}
+		return tx, waitForTx(sdk.Client, tx.Hash(), txWaitTimeBetweenAttempts, txMaxAttempts)
 	}
 }
 
@@ -245,41 +271,43 @@ func (sdk *NftModule) SetRoyaltyBps(amount *big.Int) error {
 	}
 }
 
-func (sdk *NftModule) v1MintTo(to string, metadata MintNftMetadata) (NftMetadata, error) {
+func (sdk *NftModule) v1MintTo(send bool, to string, metadata MintNftMetadata) (*types.Transaction, NftMetadata, error) {
 	if sdk.main.getSignerAddress() == common.HexToAddress("0") {
-		return NftMetadata{}, &NoSignerError{
+		return nil, NftMetadata{}, &NoSignerError{
 			typeName: "Nft",
 		}
 	}
 	uri, err := sdk.main.getGateway().Upload(metadata, "", "")
 	if err != nil {
-		return NftMetadata{}, err
+		return nil, NftMetadata{}, err
 	}
 	log.Printf("Got back uri = %v\n", uri)
 
 	tx, err := sdk.oldModule.MintNFT(sdk.main.getTransactOpts(true), common.HexToAddress(to), uri)
 	if err != nil {
 		log.Printf("Failed to execute transaction %v\n", tx.Hash().String())
-		return NftMetadata{}, err
+		return nil, NftMetadata{}, err
 	}
-
+	if !send {
+		return tx, NftMetadata{}, err
+	}
 	if err := waitForTx(sdk.Client, tx.Hash(), txWaitTimeBetweenAttempts, txMaxAttempts); err != nil {
 		// TODO: return clearer error
-		return NftMetadata{}, err
+		return tx, NftMetadata{}, err
 	}
 
 	receipt, err := sdk.Client.TransactionReceipt(context.Background(), tx.Hash())
 	if err != nil {
 		log.Printf("Failed to lookup transaction receipt with hash %v\n", tx.Hash().String())
-		return NftMetadata{}, err
+		return tx, NftMetadata{}, err
 	}
 
 	tokenId, err := sdk.getNewMintedNft(receipt.Logs)
 	if err != nil {
-		return NftMetadata{}, err
+		return tx, NftMetadata{}, err
 	}
 
-	return NftMetadata{
+	return tx, NftMetadata{
 		Id:          tokenId,
 		Image:       metadata.Image,
 		Description: metadata.Description,
@@ -288,31 +316,33 @@ func (sdk *NftModule) v1MintTo(to string, metadata MintNftMetadata) (NftMetadata
 	}, err
 }
 
-func (sdk *NftModule) MintTo(to string, metadata MintNftMetadata) (NftMetadata, error) {
+func (sdk *NftModule) MintTo(send bool, to string, metadata MintNftMetadata) (*types.Transaction, NftMetadata, error) {
 	if sdk.isV1() {
-		return sdk.v1MintTo(to, metadata)
+		return sdk.v1MintTo(send, to, metadata)
 	}
 
 	if sdk.main.getSignerAddress() == common.HexToAddress("0") {
-		return NftMetadata{}, &NoSignerError{
+		return nil, NftMetadata{}, &NoSignerError{
 			typeName: "Nft",
 		}
 	}
 	uri, err := sdk.main.getGateway().Upload(metadata, "", "")
 	if err != nil {
-		return NftMetadata{}, err
+		return nil, NftMetadata{}, err
 	}
 	log.Printf("Got back uri = %v\n", uri)
 
-	tx, err := sdk.module.NFTTransactor.MintTo(sdk.main.getTransactOpts(true), common.HexToAddress(to), uri)
+	tx, err := sdk.module.NFTTransactor.MintTo(sdk.main.getTransactOpts(send), common.HexToAddress(to), uri)
 	if err != nil {
 		log.Printf("Failed to execute transaction %v, tx=%v\n", err, tx)
-		return NftMetadata{}, err
+		return tx, NftMetadata{}, err
 	}
-
+	if !send {
+		return tx, NftMetadata{}, err
+	}
 	if err := waitForTx(sdk.Client, tx.Hash(), txWaitTimeBetweenAttempts, txMaxAttempts); err != nil {
 		// TODO: return clearer error
-		return NftMetadata{}, err
+		return tx, NftMetadata{}, err
 	}
 	var receipt *types.Receipt
 	for i := 0; i < 30; i++ {
@@ -324,15 +354,15 @@ func (sdk *NftModule) MintTo(to string, metadata MintNftMetadata) (NftMetadata, 
 	}
 	if err != nil {
 		log.Printf("Failed to lookup transaction receipt with hash %v\n", tx.Hash().String())
-		return NftMetadata{}, err
+		return tx, NftMetadata{}, err
 	}
 
 	tokenId, err := sdk.getNewMintedNft(receipt.Logs)
 	if err != nil {
-		return NftMetadata{}, err
+		return tx, NftMetadata{}, err
 	}
 
-	return NftMetadata{
+	return tx, NftMetadata{
 		Id:          tokenId,
 		Image:       metadata.Image,
 		Description: metadata.Description,
@@ -341,11 +371,11 @@ func (sdk *NftModule) MintTo(to string, metadata MintNftMetadata) (NftMetadata, 
 	}, err
 }
 
-func (sdk *NftModule) Mint(metadata MintNftMetadata) (NftMetadata, error) {
+func (sdk *NftModule) Mint(send bool, metadata MintNftMetadata) (*types.Transaction, NftMetadata, error) {
 	if sdk.main.getSignerAddress() == common.HexToAddress("0") {
-		return NftMetadata{}, &NoSignerError{typeName: "nft"}
+		return nil, NftMetadata{}, &NoSignerError{typeName: "nft"}
 	}
-	return sdk.MintTo(sdk.main.getSignerAddress().String(), metadata)
+	return sdk.MintTo(send, sdk.main.getSignerAddress().String(), metadata)
 }
 
 func (sdk *NftModule) SetApproval(operator string, approved bool) error {
@@ -550,15 +580,14 @@ func (sdk *NftModule) Balance(tokenId *big.Int) (*big.Int, error) {
 	return sdk.module.NFTCaller.BalanceOf(&bind.CallOpts{}, sdk.main.getSignerAddress())
 }
 
-func (sdk *NftModule) Transfer(to string, tokenId *big.Int) error {
+func (sdk *NftModule) Transfer(send bool, to string, tokenId *big.Int) (*types.Transaction, error) {
 	if sdk.main.getSignerAddress() == common.HexToAddress("0") {
-		return &NoSignerError{typeName: "nft"}
+		return nil, &NoSignerError{typeName: "nft"}
 	}
 
 	// TODO: allow you to pass transact opts
-	_, err := sdk.module.NFTTransactor.SafeTransferFrom(sdk.main.getTransactOpts(true), sdk.main.getSignerAddress(), common.HexToAddress(to), tokenId)
 
-	return err
+	return sdk.module.NFTTransactor.SafeTransferFrom(sdk.main.getTransactOpts(send), sdk.main.getSignerAddress(), common.HexToAddress(to), tokenId)
 }
 
 func (sdk *NftModule) getNewMintedNft(logs []*types.Log) (*big.Int, error) {

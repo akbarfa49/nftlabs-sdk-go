@@ -3,38 +3,39 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+
 	"github.com/nftlabs/nftlabs-sdk-go/pkg/nftlabs"
 	"github.com/spf13/cobra"
-	"log"
 )
 
 const (
-	nameFlag        = "name"
-	descriptionFlag = "description"
-	imageFlag       = "image"
-	externalUrlFlag = "externalUrl"
+	nameFlag                 = "name"
+	descriptionFlag          = "description"
+	imageFlag                = "image"
+	externalUrlFlag          = "externalUrl"
 	sellerFeeBasisPointsFlag = "sellerFeeBasisPoints"
-	feeRecipientFlag = "feeRecipient"
-	backgroundColorFlag = "backgroundColor"
+	feeRecipientFlag         = "feeRecipient"
+	backgroundColorFlag      = "backgroundColor"
 )
 
 var (
-	nftContractAddress string
-	nftMetadata        nftlabs.MintNftMetadata
+	nftContractAddress   string
+	nftMetadata          nftlabs.MintNftMetadata
 	sellerFeeBasisPoints int64
 )
 
 var nftCmd = &cobra.Command{
 	Use:   "nft [command]",
 	Short: "Interact with an nft contract",
-	Args: cobra.MinimumNArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Println("Hello from the inside nft")
 	},
 }
 
-var nftGetAllCmd = &cobra.Command {
-	Use: "getAll",
+var nftGetAllCmd = &cobra.Command{
+	Use:   "getAll",
 	Short: "Get all available nfts in a contract `ADDRESS`",
 	Run: func(cmd *cobra.Command, args []string) {
 		module, err := getNftModule()
@@ -53,8 +54,8 @@ var nftGetAllCmd = &cobra.Command {
 	},
 }
 
-var nftMintCmd = &cobra.Command {
-	Use: "mint",
+var nftMintCmd = &cobra.Command{
+	Use:   "mint",
 	Short: "Get all available nfts in a contract",
 	Run: func(cmd *cobra.Command, args []string) {
 		module, err := getNftModule()
@@ -62,7 +63,7 @@ var nftMintCmd = &cobra.Command {
 			panic(err)
 		}
 
-		if nft, err := module.Mint(nftMetadata); err != nil {
+		if _, nft, err := module.Mint(true, nftMetadata); err != nil {
 			panic(err)
 		} else {
 			log.Printf("Minted nft with info = %v\n", nft)
@@ -73,10 +74,10 @@ var nftMintCmd = &cobra.Command {
 	},
 }
 
-var nftGetOwnedCmd = &cobra.Command {
-	Use: "getOwned [address]",
-	Short: "Get all nfts owned by wallet `address`",
-	Args: cobra.ExactArgs(1),
+var nftGetOwnedCmd = &cobra.Command{
+	Use:       "getOwned [address]",
+	Short:     "Get all nfts owned by wallet `address`",
+	Args:      cobra.ExactArgs(1),
 	ValidArgs: []string{"address"},
 	Run: func(cmd *cobra.Command, args []string) {
 		module, err := getNftModule()

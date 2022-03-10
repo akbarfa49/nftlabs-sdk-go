@@ -26,7 +26,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if result, err := nftModule.Mint(nftlabs.MintNftMetadata{
+	if tx, result, err := nftModule.Mint(true, nftlabs.MintNftMetadata{
 		Name:        "",
 		Description: "",
 		Image:       "",

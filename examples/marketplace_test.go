@@ -1,6 +1,7 @@
 package examples
 
 import (
+	"fmt"
 	"log"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 )
 
 func TestExampleMarketplace(t *testing.T) {
-	marketplacemodule := "0x7d5aC19e543f0146d79AE273faf55A97E57996c9"
+	marketplacemodule := "0x5d463684a15a40C102F23987989787C2Bb171E61"
 	chainRpcUrl := "https://matic-mumbai.chainstacklabs.com" // change this
 
 	client, err := ethclient.Dial(chainRpcUrl)
@@ -31,6 +32,7 @@ func TestExampleMarketplace(t *testing.T) {
 	}
 	log.Println(`amount: `, len(list))
 	for _, v := range list {
-		log.Println(v)
+		log.Println(v.SaleStart.Date())
+		fmt.Println(v.SaleEnd.Date())
 	}
 }
