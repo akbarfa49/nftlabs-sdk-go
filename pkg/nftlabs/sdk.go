@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/kpango/fastime"
 )
 
 type ISdk interface {
@@ -38,7 +40,12 @@ type Sdk struct {
 	privateKey    *ecdsa.PrivateKey
 	rawPrivateKey string
 	signerAddress common.Address
-
+	Noncer        struct {
+		WaitNonce *sync.Mutex
+		Nonce     uint64
+		Used      uint64
+		LastFetch int64
+	}
 	gateway Storage
 }
 
@@ -74,7 +81,17 @@ func NewSdk(client *ethclient.Client, opt *SdkOptions) (*Sdk, error) {
 			sdk.opt.ChainID = v
 		}
 	}
-	sdk.opt.SpecialCurrency = append(sdk.opt.SpecialCurrency, specialCurrency[sdk.opt.ChainID]...)
+	sdk.Noncer = struct {
+		WaitNonce *sync.Mutex
+		Nonce     uint64
+		Used      uint64
+		LastFetch int64
+	}{
+		WaitNonce: new(sync.Mutex),
+		Nonce:     0,
+		Used:      0,
+		LastFetch: 0,
+	}
 	return sdk, nil
 }
 
@@ -183,13 +200,19 @@ func (sdk *Sdk) getGateway() Storage {
 func (sdk *Sdk) getTransactOpts(send bool) *bind.TransactOpts {
 	var tipCap, feeCap *big.Int
 
-	block, err := sdk.client.BlockByNumber(context.Background(), nil)
-	if err == nil && block.BaseFee() != nil {
-		tipCap, _ = big.NewInt(0).SetString("2500000000", 10)
-		baseFee := big.NewInt(0).Mul(block.BaseFee(), big.NewInt(2))
-		feeCap = big.NewInt(0).Add(baseFee, tipCap)
+	sdk.Noncer.WaitNonce.Lock()
+	var nNonce *big.Int
+	if send {
+		if sdk.Noncer.Nonce == 0 || sdk.Noncer.Used%10 == 0 || sdk.Noncer.LastFetch+300 < fastime.UnixNow() {
+			sdk.Noncer.Nonce, _ = sdk.client.PendingNonceAt(context.Background(), sdk.getSignerAddress())
+			sdk.Noncer.LastFetch = fastime.UnixNow()
+		} else {
+			sdk.Noncer.Nonce++
+		}
+		nNonce = big.NewInt(0).SetUint64(sdk.Noncer.Nonce)
+		sdk.Noncer.Used++
 	}
-
+	sdk.Noncer.WaitNonce.Unlock()
 	if sdk.opt.GasPrice != nil {
 		gasPriceInGwei := big.NewInt(1)
 		toGweiFactor := big.NewInt(1).Exp(big.NewInt(10), big.NewInt(9), nil)
@@ -200,14 +223,23 @@ func (sdk *Sdk) getTransactOpts(send bool) *bind.TransactOpts {
 			From:     sdk.getSignerAddress(),
 			Signer:   sdk.getSigner(),
 			GasPrice: finalGasPrice,
+			Nonce:    nNonce,
 		}
 	}
+	block, err := sdk.client.BlockByNumber(context.Background(), nil)
+	if err == nil && block.BaseFee() != nil {
+		tipCap, _ = big.NewInt(0).SetString("2500000000", 10)
+		baseFee := big.NewInt(0).Mul(block.BaseFee(), big.NewInt(2))
+		feeCap = big.NewInt(0).Add(baseFee, tipCap)
+	}
+
 	return &bind.TransactOpts{
 		NoSend:    !send,
 		From:      sdk.getSignerAddress(),
 		Signer:    sdk.getSigner(),
 		GasTipCap: tipCap,
 		GasFeeCap: feeCap,
+		Nonce:     nNonce,
 	}
 }
 
