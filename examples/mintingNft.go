@@ -33,6 +33,7 @@ func main() {
 	}); err != nil {
 		log.Fatal(err)
 	} else {
+		log.Println(tx.Hash())
 		log.Printf("Minted new nft with ID %d", result.Id)
 	}
 }
