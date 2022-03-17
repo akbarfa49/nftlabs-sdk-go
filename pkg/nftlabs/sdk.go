@@ -204,8 +204,13 @@ func (sdk *Sdk) getTransactOpts(send bool) *bind.TransactOpts {
 	sdk.Noncer.WaitNonce.Lock()
 	var nNonce *big.Int
 	if send {
-		if sdk.Noncer.Nonce == 0 || sdk.Noncer.Used%10 == 0 || sdk.Noncer.LastFetch+300 < fastime.UnixNow() {
-			sdk.Noncer.Nonce, _ = sdk.client.PendingNonceAt(context.Background(), sdk.getSignerAddress())
+		if sdk.Noncer.Nonce == 0 || sdk.Noncer.LastFetch+300 < fastime.UnixNow() {
+			nonce, err := sdk.client.PendingNonceAt(context.Background(), sdk.getSignerAddress())
+			if err == nil && nonce > sdk.Noncer.Nonce {
+				sdk.Noncer.Nonce = nonce
+			} else {
+				sdk.Noncer.Nonce++
+			}
 			sdk.Noncer.LastFetch = fastime.UnixNow()
 		} else {
 			sdk.Noncer.Nonce++
