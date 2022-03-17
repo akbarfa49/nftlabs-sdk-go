@@ -24,6 +24,7 @@ type ISdk interface {
 	TransferNativeToken(to string, amount *big.Int) error
 
 	SetStorage(gateway Storage)
+	SetGasPrice(gasprice *big.Int)
 
 	getSignerAddress() common.Address
 	getSigner() func(address common.Address, transaction *types.Transaction) (*types.Transaction, error)
@@ -275,4 +276,6 @@ func (sdk *Sdk) TransferNativeToken(to string, amount *big.Int) error {
 	return nil
 }
 
-type chainId *big.Int
+func (sdk *Sdk) SetGasPrice(gasPrice *big.Int) {
+	sdk.opt.GasPrice = gasPrice
+}
