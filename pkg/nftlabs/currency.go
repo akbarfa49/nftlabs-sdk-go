@@ -29,6 +29,7 @@ type Currency interface {
 	RevokeRole(role Role, address string) error
 	TotalSupply() (*big.Int, error)
 	SetRestrictedTransfer(restricted bool) error
+	Multicall(data ...[]byte) (*types.Transaction, error)
 
 	formatUnits(value *big.Int, units *big.Int) string
 	getModule() *abi.Currency
