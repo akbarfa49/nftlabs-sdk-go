@@ -3,7 +3,6 @@ module github.com/nftlabs/nftlabs-sdk-go
 go 1.16
 
 require (
-	github.com/akbarfa49/collection v0.0.0-20211227044303-c16d96506f0f
 	github.com/ethereum/go-ethereum v1.10.15
 	github.com/kpango/fastime v1.1.4
 	github.com/spf13/cobra v0.0.3
