@@ -12,8 +12,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
 )
 
 type Market interface {
@@ -28,14 +28,14 @@ type Market interface {
 }
 
 type MarketModule struct {
-	Client  *ethclient.Client
+	Client  globalClient.IClient
 	Address string
 	module  *abi.Market
 
 	main ISdk
 }
 
-func newMarketModule(client *ethclient.Client, address string, main ISdk) (*MarketModule, error) {
+func newMarketModule(client globalClient.IClient, address string, main ISdk) (*MarketModule, error) {
 	module, err := abi.NewMarket(common.HexToAddress(address), client)
 	if err != nil {
 		return nil, err

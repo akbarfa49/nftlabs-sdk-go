@@ -14,8 +14,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
 )
 
 type Nft interface {
@@ -44,7 +44,7 @@ type Nft interface {
 
 type NftModule struct {
 	defaultModuleImpl
-	Client  *ethclient.Client
+	Client  globalClient.IClient
 	Address string
 	Options *SdkOptions
 	module  *abi.NFT
@@ -450,7 +450,7 @@ func (sdk *NftModule) GetOwned(address string) ([]NftMetadata, error) {
 	return results, nil
 }
 
-func newNftModule(client *ethclient.Client, address string, main ISdk) (Nft, error) {
+func newNftModule(client globalClient.IClient, address string, main ISdk) (Nft, error) {
 	module, err := abi.NewNFT(common.HexToAddress(address), client)
 	if err != nil {
 		// TODO: return better error

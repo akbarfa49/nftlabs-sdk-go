@@ -5,18 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	ethAbi "github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/core/types"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"math/big"
 	"sync"
 	"time"
 
+	ethAbi "github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/core/types"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
 )
 
 type Pack interface {
@@ -32,14 +33,14 @@ type Pack interface {
 }
 
 type PackModule struct {
-	Client        *ethclient.Client
-	Address       string
-	module        *abi.Pack
+	Client  globalClient.IClient
+	Address string
+	module  *abi.Pack
 
 	main ISdk
 }
 
-func newPackModule(client *ethclient.Client, address string, main ISdk) (*PackModule, error) {
+func newPackModule(client globalClient.IClient, address string, main ISdk) (*PackModule, error) {
 	module, err := abi.NewPack(common.HexToAddress(address), client)
 	if err != nil {
 		return nil, err
@@ -49,7 +50,7 @@ func newPackModule(client *ethclient.Client, address string, main ISdk) (*PackMo
 		Client:  client,
 		Address: address,
 		module:  module,
-		main: main,
+		main:    main,
 	}, nil
 }
 
@@ -234,11 +235,11 @@ func (sdk *PackModule) GetAll() ([]PackMetadata, error) {
 	}
 
 	wg := new(errgroup.Group)
-	packs := make([]PackMetadata, maxId.Int64() + 1)
+	packs := make([]PackMetadata, maxId.Int64()+1)
 	for i := big.NewInt(0); i.Cmp(maxId) == -1; i.Add(i, big.NewInt(1)) {
 		id := big.NewInt(0)
 		id.SetString(i.String(), 10)
-		func (id *big.Int) {
+		func(id *big.Int) {
 			wg.Go(func() error {
 				log.Printf("Calling get with id = %d\n", id)
 				metadata, err := sdk.Get(id)
@@ -277,7 +278,7 @@ func (sdk *PackModule) GetNfts(packId *big.Int) ([]PackNft, error) {
 
 	packNfts := make([]PackNft, len(result.TokenIds))
 	for index, id := range result.TokenIds {
-		func (index int, id *big.Int) {
+		func(index int, id *big.Int) {
 			wg.Go(func() error {
 				metadata, err := collectionModule.Get(id)
 				if err != nil {

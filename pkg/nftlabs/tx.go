@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
 )
 
-func waitForTx(client *ethclient.Client, hash common.Hash, wait time.Duration, maxAttempts uint8) error {
+func waitForTx(client globalClient.IClient, hash common.Hash, wait time.Duration, maxAttempts uint8) error {
 	attempts := uint8(0)
 	var syncError error
+	time.Sleep(10 * time.Second)
 	for {
 		if attempts >= maxAttempts {
 			fmt.Println("Retry attempts to get tx exhausted, tx might have failed")

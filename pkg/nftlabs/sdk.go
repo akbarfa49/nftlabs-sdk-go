@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/kpango/fastime"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
 )
 
 type ISdk interface {
@@ -35,7 +35,7 @@ type ISdk interface {
 }
 
 type Sdk struct {
-	client *ethclient.Client
+	client globalClient.IClient
 	opt    *SdkOptions
 
 	privateKey    *ecdsa.PrivateKey
@@ -52,7 +52,7 @@ type Sdk struct {
 
 var chainCache = make(map[string]*big.Int, 0)
 
-func NewSdk(client *ethclient.Client, opt *SdkOptions) (*Sdk, error) {
+func NewSdk(client globalClient.IClient, opt *SdkOptions) (*Sdk, error) {
 
 	if opt.IpfsGatewayUrl == "" {
 		opt.IpfsGatewayUrl = "https://cloudflare-ipfs.com/ipfs/"

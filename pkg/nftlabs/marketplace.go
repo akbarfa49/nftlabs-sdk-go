@@ -1,16 +1,22 @@
 package nftlabs
 
 import (
+	"context"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
+	ethabi "github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/kpango/fastime"
 	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
 )
 
 type Marketplace interface {
@@ -18,17 +24,18 @@ type Marketplace interface {
 	GetAll(filter ListingFilter) ([]Listing, error)
 	GetMarketFeeBps() (*big.Int, error)
 	SetMarketFeeBps(fee *big.Int) error
+	WatchNewListing(sink chan<- interface{}) (ethereum.Subscription, error)
 }
 
 type MarketplaceModule struct {
-	Client  *ethclient.Client
+	Client  globalClient.IClient
 	Address string
 	module  *abi.Marketplace
 
 	main ISdk
 }
 
-func newMarketplaceModule(client *ethclient.Client, address string, main ISdk) (*MarketplaceModule, error) {
+func newMarketplaceModule(client globalClient.IClient, address string, main ISdk) (*MarketplaceModule, error) {
 	module, err := abi.NewMarketplace(common.HexToAddress(address), client)
 	if err != nil {
 		return nil, err
@@ -210,4 +217,82 @@ func (sdk *MarketplaceModule) transformResultToListing(listing abi.IMarketplaceL
 		SaleStart:        saleStart,
 		SaleEnd:          saleEnd,
 	}, nil
+}
+func (sdk *MarketplaceModule) WatchNewListing(sink chan<- interface{}) (ethereum.Subscription, error) {
+	// sink := make(chan *abi.MarketplaceNewListing)
+
+	// es, err := sdk.module.WatchNewListing(&bind.WatchOpts{}, sink, nil, []common.Address{common.HexToAddress(sdk.Address)}, nil)
+	// log.Println(err)
+	// go func() {
+	// 	log.Println(`watching`)
+	// 	for {
+	// 		log.Println(`waiting for sink`)
+	// 		v := <-sink
+	// 		log.Println(v.Listing.TokenOwner.String())
+	// 	}
+	// }()
+	parsedabi, err := ethabi.JSON(strings.NewReader(abi.MarketplaceABI))
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range parsedabi.Events {
+		fmt.Println(k)
+		fmt.Println(v.ID)
+	}
+
+	e := ethereum.FilterQuery{
+		Addresses: []common.Address{common.HexToAddress(sdk.Address)},
+	}
+	logs := make(chan types.Log)
+	sub, err := sdk.Client.SubscribeFilterLogs(context.Background(), e, logs)
+	// parsedabi, _ := ethabi.JSON(strings.NewReader(abi.MarketplaceABI))
+	// parsedabi.Unpack()
+	// log.Println(parsedabi.Events)
+	// parsedabi
+	unpacker := func(abii ethabi.ABI, out interface{}, event string, log types.Log) error {
+		if len(log.Data) > 0 {
+			if err := abii.UnpackIntoInterface(out, event, log.Data); err != nil {
+				return err
+			}
+		}
+		var indexed ethabi.Arguments
+		for _, arg := range abii.Events[event].Inputs {
+			if arg.Indexed {
+				indexed = append(indexed, arg)
+			}
+		}
+		return ethabi.ParseTopics(out, indexed, log.Topics[1:])
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+
+			case <-quit:
+				return nil
+
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				switch log.Topics[0].String() {
+
+				//NewListing
+				case `0x9e578277632a71dd17ab11c1f584c51deafef022c94389ecb050eb92713725f6`:
+					nebi := new(abi.MarketplaceNewListing)
+					if err := unpacker(parsedabi, nebi, `NewListing`, log); err != nil {
+						return err
+					}
+				case `0xa00227275ba75aea329d91406a2884d227dc386f939f1d18e15a7317152432ca`:
+					nebi := new(abi.MarketplaceListingUpdate)
+					if err := unpacker(parsedabi, nebi, `ListingUpdate`, log); err != nil {
+						return err
+					}
+				}
+			case err := <-sub.Err():
+				return err
+			}
+
+		}
+
+	}), nil
 }
