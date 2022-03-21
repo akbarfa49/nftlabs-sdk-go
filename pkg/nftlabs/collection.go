@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"math/big"
 	"sync"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
+	"golang.org/x/sync/errgroup"
 )
 
 type NftCollection interface {
@@ -51,7 +52,7 @@ type NftCollection interface {
 }
 
 type NftCollectionModule struct {
-	Client  *ethclient.Client
+	Client  globalClient.IClient
 	Address string
 	module  *abi.NFTCollection
 
@@ -68,7 +69,7 @@ func (sdk *NftCollectionModule) Burn(args NftCollectionBatchArgs) error {
 	return sdk.BurnFrom(sdk.main.getSignerAddress().String(), args)
 }
 
-func newNftCollectionModule(client *ethclient.Client, address string, main ISdk) (*NftCollectionModule, error) {
+func newNftCollectionModule(client globalClient.IClient, address string, main ISdk) (*NftCollectionModule, error) {
 	module, err := abi.NewNFTCollection(common.HexToAddress(address), client)
 	if err != nil {
 		// TODO: return better error
@@ -79,7 +80,7 @@ func newNftCollectionModule(client *ethclient.Client, address string, main ISdk)
 		Client:  client,
 		Address: address,
 		module:  module,
-		main: main,
+		main:    main,
 	}, nil
 }
 
@@ -105,7 +106,7 @@ func (sdk *NftCollectionModule) Get(tokenId *big.Int) (CollectionMetadata, error
 	}
 
 	supply, err := sdk.module.TotalSupply(&bind.CallOpts{}, tokenId)
-	if err != nil{
+	if err != nil {
 		return CollectionMetadata{}, err
 	}
 
@@ -430,7 +431,7 @@ func (sdk *NftCollectionModule) SetApproval(operator string, approved bool) erro
 	if tx, err := sdk.module.SetApprovalForAll(&bind.TransactOpts{
 		NoSend: false,
 		Signer: sdk.main.getSigner(),
-		From: sdk.main.getSignerAddress(),
+		From:   sdk.main.getSignerAddress(),
 	}, common.HexToAddress(operator), approved); err != nil {
 		return err
 	} else {
@@ -445,7 +446,7 @@ func (sdk *NftCollectionModule) SetRoyaltyBps(amount *big.Int) error {
 	if tx, err := sdk.module.SetRoyaltyBps(&bind.TransactOpts{
 		NoSend: false,
 		Signer: sdk.main.getSigner(),
-		From: sdk.main.getSignerAddress(),
+		From:   sdk.main.getSignerAddress(),
 	}, amount); err != nil {
 		return err
 	} else {
@@ -463,7 +464,7 @@ func (sdk *NftCollectionModule) TransferBatchFrom(from string, to string, args [
 	if tx, err := sdk.module.SafeBatchTransferFrom(&bind.TransactOpts{
 		NoSend: false,
 		Signer: sdk.main.getSigner(),
-		From: sdk.main.getSignerAddress(),
+		From:   sdk.main.getSignerAddress(),
 	}, common.HexToAddress(from), common.HexToAddress(to), ids, amounts, nil); err != nil {
 		return err
 	} else {
@@ -475,7 +476,7 @@ func (sdk *NftCollectionModule) TransferFrom(from string, to string, args NftCol
 	if tx, err := sdk.module.SafeTransferFrom(&bind.TransactOpts{
 		NoSend: false,
 		Signer: sdk.main.getSigner(),
-		From: sdk.main.getSignerAddress(),
+		From:   sdk.main.getSignerAddress(),
 	}, common.HexToAddress(from), common.HexToAddress(to), args.TokenId, args.Amount, nil); err != nil {
 		return err
 	} else {

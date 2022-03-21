@@ -5,8 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
 )
 
 type erc20 interface {
@@ -14,7 +14,7 @@ type erc20 interface {
 }
 
 type erc20Module struct {
-	Client  *ethclient.Client
+	Client  globalClient.IClient
 	Address string
 	Options *SdkOptions
 	module  *abi.ERC20
@@ -23,7 +23,7 @@ type erc20Module struct {
 	signerAddress common.Address
 }
 
-func newErc20SdkModule(client *ethclient.Client, address string, opt *SdkOptions) (*erc20Module, error) {
+func newErc20SdkModule(client globalClient.IClient, address string, opt *SdkOptions) (*erc20Module, error) {
 	module, err := abi.NewERC20(common.HexToAddress(address), client)
 	if err != nil {
 		// TODO: return better error

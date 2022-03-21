@@ -5,8 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
 )
 
 type erc1155 interface {
@@ -14,7 +14,7 @@ type erc1155 interface {
 }
 
 type erc1155Module struct {
-	Client  *ethclient.Client
+	Client  globalClient.IClient
 	Address string
 	Options *SdkOptions
 	module  *abi.ERC1155
@@ -23,7 +23,7 @@ type erc1155Module struct {
 	signerAddress common.Address
 }
 
-func newErc1155Module(client *ethclient.Client, address string, opt *SdkOptions) (*erc1155Module, error) {
+func newErc1155Module(client globalClient.IClient, address string, opt *SdkOptions) (*erc1155Module, error) {
 	module, err := abi.NewERC1155(common.HexToAddress(address), client)
 	if err != nil {
 		// TODO: return better error

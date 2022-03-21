@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/nftlabs/nftlabs-sdk-go/internal/abi"
+	"github.com/nftlabs/nftlabs-sdk-go/pkg/globalClient"
 )
 
 type Currency interface {
@@ -37,7 +37,7 @@ type Currency interface {
 
 type CurrencyModule struct {
 	defaultModuleImpl
-	Client  *ethclient.Client
+	Client  globalClient.IClient
 	Address string
 	module  *abi.Currency
 
@@ -61,7 +61,7 @@ func (sdk *CurrencyModule) getModule() *abi.Currency {
 	return sdk.module
 }
 
-func newCurrencyModule(client *ethclient.Client, asset string, main ISdk) (*CurrencyModule, error) {
+func newCurrencyModule(client globalClient.IClient, asset string, main ISdk) (*CurrencyModule, error) {
 	module, err := abi.NewCurrency(common.HexToAddress(asset), client)
 	if err != nil {
 		return nil, err
